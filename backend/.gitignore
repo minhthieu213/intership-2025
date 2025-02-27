@@ -1,0 +1,11 @@
+# Bỏ qua file môi trường
+.env
+.env.local
+.env.development
+.env.production
+
+# Bỏ qua thư mục node_modules
+node_modules/
+
+# Bỏ qua thư mục Drizzle ORM migration
+drizzle/
