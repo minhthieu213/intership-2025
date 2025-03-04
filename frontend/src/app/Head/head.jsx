@@ -2,7 +2,7 @@ import React from 'react'
 import InputDemo from "@/app/Head/filter";
 import ButtonDemo from "@/app/Head/button";
 
-export default function head() {
+export default function Head() {
   return (
     <div className="flex px-4 w-full pt-5">
         <InputDemo className="flex-grow"/>
