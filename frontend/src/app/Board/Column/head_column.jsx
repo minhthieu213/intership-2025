@@ -9,7 +9,7 @@ import {
 export default function HeadColumn({ title, description, numberTask, className }) {
 
   const statusClasses = {
-    'Todo': 'border-green-500 bg-green-200',
+    'To Do': 'border-green-500 bg-green-200',
     'In Progress': 'border-yellow-500 bg-yellow-200',
     'Done': 'border-purple-500 bg-purple-200',
   };

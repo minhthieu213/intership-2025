@@ -5,6 +5,7 @@ export default function FootColumn({className, onClick}) {
   return (
     <div 
       onClick={onClick}
+      onPointerDown={(e) => e.stopPropagation()} 
       className={`${className} text-gray-700 font-semibold text-base rounded-lg relative`}
     >
       <div className='px-4 py-2 flex items-center gap-2 hover:bg-gray-200 hover:cursor-pointer select-none'>
