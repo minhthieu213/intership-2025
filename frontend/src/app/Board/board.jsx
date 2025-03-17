@@ -31,6 +31,7 @@ import {
 import Column from "@/app/Board/Column/column";
 import Card from "./Column/Card/card";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Board() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -56,6 +57,7 @@ export default function Board() {
   const updateTaskOrderMutation = useUpdateTaskOrder();
 
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const ACTIVE_DRAG_ITEM_TYPE = {
     COLUMN: "ACTIVE_DRAG_ITEM_TYPE_COLUMN",
@@ -95,26 +97,30 @@ export default function Board() {
   const handleAddOrUpdateTask = async () => {
     if (!title.trim() || !description.trim()) return;
 
-    const newTask = {
-      title,
-      description,
-      columnId: currentStatus,
-    };
-
     try {
       if (currentTaskId) {
-        await updateTaskMutation.mutateAsync({ id: currentTaskId, ...newTask });
+        await updateTaskMutation.mutateAsync({
+          id: currentTaskId,
+          title,
+          description,
+          columnId: currentStatus,
+        });
       } else {
-        await createTaskMutation.mutateAsync(newTask);
+        // Tạo task mới - orderTask sẽ được xử lý ở backend
+        await createTaskMutation.mutateAsync({
+          title,
+          description,
+          columnId: currentStatus,
+        });
       }
+
+      setTitle("");
+      setDescription("");
+      setDialogOpen(false);
+      setCurrentTaskId(null);
     } catch (error) {
       console.error("Error adding/updating task:", error);
     }
-
-    setTitle("");
-    setDescription("");
-    setDialogOpen(false);
-    setCurrentTaskId(null);
   };
 
   const handleRemoveTask = async (id) => {
@@ -156,47 +162,90 @@ export default function Board() {
   };
 
   // is dragging
-  const handleDragOver = (event) => {
-    if (activeDragItemType === ACTIVE_DRAG_ITEM_TYPE.COLUMN) return;
+  const handleDragOver = async (event) => {
+    const { active, over } = event;
+    if (!active || !over) return;
+
+    // Only handle cards
+    if (activeDragItemType === ACTIVE_DRAG_ITEM_TYPE.CARD) {
+      const activeColumn = findColumnByCardId(active.id);
+      const overColumn = columnsData.find((col) => col.id === over.id);
+
+      // If dragging card to a new column
+      if (overColumn && activeColumn.id !== overColumn.id) {
+        try {
+          // Get all tasks in the target column
+          const tasksInTargetColumn = sortedTasks.filter(
+            (task) => task.columnId === overColumn.id
+          );
+
+          // Update order for existing tasks in target column
+          const updatePromises = tasksInTargetColumn.map((task, index) => {
+            return updateTaskOrderMutation.mutateAsync({
+              taskId: task.id,
+              newOrder: index + 1, // Leave 0 for the new card
+            });
+          });
+
+          await Promise.all(updatePromises);
+
+          // Update the dragged card
+          await updateTaskMutation.mutateAsync({
+            id: parseInt(active.id),
+            columnId: overColumn.id,
+            title: activeDragItemData.title,
+            description: activeDragItemData.description,
+            orderTask: 0, // Place dragged card at the top
+          });
+        } catch (error) {
+          console.error("Failed to update tasks:", error);
+        }
+      }
+    }
   };
 
-  // Drag End
   const handleDragEnd = async (event) => {
     const { active, over } = event;
     if (!active || !over) return;
 
     if (activeDragItemType === ACTIVE_DRAG_ITEM_TYPE.CARD) {
-      const {
-        id: activeDraggingCardId,
-        data: { current: activeDraggingCardData },
-      } = active;
+      const { id: activeDraggingCardId } = active;
 
       const overColumn = columnsData.find((col) => col.id === over.id);
+
       if (overColumn) {
         const tasksInTargetColumn = sortedTasks.filter(
-          (task) => task.columnId === overColumn.id
+          (task) =>
+            task.columnId === overColumn.id &&
+            task.id.toString() !== activeDraggingCardId
         );
 
-        const newOrder =
-          tasksInTargetColumn.length > 0
-            ? Math.max(...tasksInTargetColumn.map((t) => t.orderTask)) + 1
-            : 1;
+
+        const updatePromises = tasksInTargetColumn.map((task, index) => {
+          return updateTaskOrderMutation.mutateAsync({
+            taskId: task.id,
+            newOrder: index + 1, 
+          });
+        });
 
         try {
+          await Promise.all(updatePromises);
+
+          // Cập nhật card được kéo với orderTask = 0
           await updateTaskMutation.mutateAsync({
             id: parseInt(activeDraggingCardId),
             columnId: overColumn.id,
-            title: activeDraggingCardData.title,
-            description: activeDraggingCardData.description,
-            orderTask: newOrder,
+            title: activeDragItemData.title,
+            description: activeDragItemData.description,
+            orderTask: 0,
           });
         } catch (error) {
-          console.error("Failed to update task:", error);
+          console.error("Failed to update tasks:", error);
         }
         return;
       }
 
-      // Trường hợp kéo vào card khác
+      // Xử lý trường hợp thả vào card khác
       const { id: overCardId } = over;
       const activeColumn = findColumnByCardId(activeDraggingCardId);
       const overCardColumn = findColumnByCardId(overCardId);
@@ -204,50 +253,47 @@ export default function Board() {
       if (!activeColumn || !overCardColumn) return;
 
       // Lấy danh sách tasks trong cột đích và sắp xếp theo orderTask
-      const tasksInTargetColumn = sortedTasks.filter(
-        (task) => task.columnId === overCardColumn.id
-      );
+      const tasksInTargetColumn = sortedTasks
+        .filter((task) => task.columnId === overCardColumn.id)
+        .sort((a, b) => a.orderTask - b.orderTask);
 
-      // Tìm vị trí của card đích
-      const overTask = tasksInTargetColumn.find(
-        (task) => task.id.toString() === overCardId
-      );
+      // Tìm index của card đích
       const overTaskIndex = tasksInTargetColumn.findIndex(
         (task) => task.id.toString() === overCardId
       );
 
-      // Tính toán order mới
-      let newOrder;
-      if (overTaskIndex === 0) {
-        // Nếu kéo lên đầu
-        newOrder = overTask.orderTask - 1;
-      } else if (overTaskIndex === tasksInTargetColumn.length - 1) {
-        // Nếu kéo xuống cuối
-        newOrder = overTask.orderTask + 1;
-      } else {
-        // Nếu kéo vào giữa, lấy trung bình của order trước và sau
-        const nextTask = tasksInTargetColumn[overTaskIndex + 1];
-        newOrder = (overTask.orderTask + nextTask.orderTask) / 2;
-      }
+      // Tạo mảng mới không bao gồm card đang kéo
+      const newTasksOrder = tasksInTargetColumn.filter(
+        (task) => task.id.toString() !== activeDraggingCardId
+      );
+
+      // Chèn card đang kéo vào vị trí mới
+      newTasksOrder.splice(overTaskIndex, 0, {
+        id: parseInt(activeDraggingCardId),
+      });
+
+      // Cập nhật lại orderTask cho tất cả các card trong cột, bắt đầu từ 0
+      const updatePromises = newTasksOrder.map((task, index) => {
+        return updateTaskOrderMutation.mutateAsync({
+          taskId: task.id,
+          newOrder: index, 
+        });
+      });
 
       try {
-        // Cập nhật order mới
-        await updateTaskOrderMutation.mutateAsync({
-          taskId: parseInt(activeDraggingCardId),
-          newOrder: newOrder,
-        });
+        await Promise.all(updatePromises);
 
         // Nếu đổi cột thì cập nhật columnId
         if (OldColumnWhenDraggingCard.id !== overCardColumn.id) {
           await updateTaskMutation.mutateAsync({
             id: parseInt(activeDraggingCardId),
             columnId: overCardColumn.id,
-            title: activeDraggingCardData.title,
-            description: activeDraggingCardData.description,
+            title: activeDragItemData.title,
+            description: activeDragItemData.description,
           });
         }
       } catch (error) {
-        console.error("Failed to update task:", error);
+        console.error("Failed to update tasks:", error);
       }
     }
 
@@ -309,7 +355,7 @@ export default function Board() {
   console.log("activeDataItemId: ", activeDragItemId);
   console.log("activeDataItemType: ", activeDragItemType);
   console.log("activeDataItemData: ", activeDragItemData);
-  
+
   if (isLoading) return <div>Loading...</div>;
   if (error) return <div>Error fetching columns</div>;
 

@@ -25,7 +25,7 @@ export const getTasks = async (_: Request, res: Response) => {
 
 export const createTask = async (req: Request, res: Response) => {
   try {
-    const { title, description, columnId } = req.body;
+    const { title, description, columnId, orderTask } = req.body;
 
     if (!title || !columnId) {
       return res
@@ -33,9 +33,23 @@ export const createTask = async (req: Request, res: Response) => {
         .json({ success: false, error: "Title and columnId are required" });
     }
 
-    const result = await db
-      .insert(tasks)
-      .values({ title, description, columnId });
+    const tasksInColumn = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.columnId, columnId));
+
+    const maxOrder =
+      tasksInColumn.length > 0
+        ? Math.max(...tasksInColumn.map((task) => task.orderTask))
+        : -1;
+    const newOrderTask = maxOrder + 1;
+
+    const result = await db.insert(tasks).values({
+      title,
+      description,
+      columnId,
+      orderTask: newOrderTask,
+    });
     const taskId = result[0].insertId;
 
     const [newTask] = await db.select().from(tasks).where(eq(tasks.id, taskId));
@@ -128,8 +142,7 @@ export const deleteTask = async (req: Request, res: Response) => {
 export const updateTaskOrder = async (req: Request, res: Response) => {
   try {
     const { tasks: updatedTasks } = req.body;
-    console.log("test: ", tasks)
-    // Kiểm tra dữ liệu đầu vào
+    console.log("test: ", tasks);
     if (!Array.isArray(updatedTasks)) {
       return res
         .status(400)
@@ -145,7 +158,6 @@ export const updateTaskOrder = async (req: Request, res: Response) => {
       }
     }
 
-    // Thực hiện transaction
     await db.transaction(async (tx) => {
       await Promise.all(
         updatedTasks.map((task) =>
