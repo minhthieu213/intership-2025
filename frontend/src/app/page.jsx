@@ -1,11 +1,13 @@
-import Head from "@/app/Head/head";
-import Board from "@/app/Board/board";
+"use client";
+import React from "react";
+import Board from "./Board/board";
+import Head from "./Head/head";
 
-export default function Home() {
+export default function Page() {
   return (
-    <div className="flex flex-col">
-        <Head/>
-        <Board/>
+    <div>
+      <Head />
+      <Board />
     </div>
   );
 }
