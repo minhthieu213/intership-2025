@@ -1,17 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-
+// 🟢 Fetch columns
 const fetchColumns = async () => {
   try {
-    const response = await axios.get(`${API_URL}/columns`);
+    const response = await fetch(`${API_URL}/columns`);
+    const data = await response.json();
 
-    if (response.data.success === true) {
-      return response.data.data ?? [];
+    if (data.success) {
+      return data.data ?? [];
     } else {
-      throw new Error(response.data.message || "Failed to fetch columns");
+      throw new Error(data.message || "Failed to fetch columns");
     }
   } catch (error) {
     console.error("Error fetching columns:", error.message);
@@ -19,14 +19,16 @@ const fetchColumns = async () => {
   }
 };
 
+// 🟢 Fetch tasks
 const fetchTasks = async () => {
   try {
-    const response = await axios.get(`${API_URL}/tasks`);
+    const response = await fetch(`${API_URL}/tasks`);
+    const data = await response.json();
 
-    if (response.data.success === true) {
-      return response.data.data ?? [];
+    if (data.success) {
+      return data.data ?? [];
     } else {
-      throw new Error(response.data.message || "Failed to fetch tasks");
+      throw new Error(data.message || "Failed to fetch tasks");
     }
   } catch (error) {
     console.error("Error fetching tasks:", error.message);
@@ -34,14 +36,21 @@ const fetchTasks = async () => {
   }
 };
 
+// 🟢 Create task
 const createTask = async (task) => {
   try {
-    const response = await axios.post(`${API_URL}/tasks`, task);
+    const response = await fetch(`${API_URL}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(task),
+    });
 
-    if (response.data.success === true) {
-      return response.data.data ?? {};
+    const data = await response.json();
+
+    if (data.success) {
+      return data.data ?? {};
     } else {
-      throw new Error(response.data.message || "Failed to create task");
+      throw new Error(data.message || "Failed to create task");
     }
   } catch (error) {
     console.error("Error creating task:", error.message);
@@ -49,14 +58,21 @@ const createTask = async (task) => {
   }
 };
 
+// 🟢 Update task
 const updateTask = async ({ id, ...task }) => {
   try {
-    const response = await axios.put(`${API_URL}/tasks/update/${id}`, task);
+    const response = await fetch(`${API_URL}/tasks/update/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(task),
+    });
 
-    if (response.data.success === true) {
-      return response.data.data ?? {};
+    const data = await response.json();
+
+    if (data.success) {
+      return data.data ?? {};
     } else {
-      throw new Error(response.data.message || "Failed to update task");
+      throw new Error(data.message || "Failed to update task");
     }
   } catch (error) {
     console.error("Error updating task:", error.message);
@@ -64,14 +80,19 @@ const updateTask = async ({ id, ...task }) => {
   }
 };
 
+// 🟢 Delete task
 const deleteTask = async (id) => {
   try {
-    const response = await axios.delete(`${API_URL}/tasks/update/${id}`);
+    const response = await fetch(`${API_URL}/tasks/update/${id}`, {
+      method: "DELETE",
+    });
 
-    if (response.data.success === true) {
-      return response.data.data ?? {};
+    const data = await response.json();
+
+    if (data.success) {
+      return data.data ?? {};
     } else {
-      throw new Error(response.data.message || "Failed to delete task");
+      throw new Error(data.message || "Failed to delete task");
     }
   } catch (error) {
     console.error("Error deleting task:", error.message);
@@ -79,16 +100,21 @@ const deleteTask = async (id) => {
   }
 };
 
+// 🟢 Update column order
 const updateColumnOrder = async (columnOrder) => {
   try {
-    const response = await axios.put(`${API_URL}/columns/order`, {
-      columnOrder,
+    const response = await fetch(`${API_URL}/columns/order`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ columnOrder }),
     });
 
-    if (response.data.success === true) {
-      return response.data;
+    const data = await response.json();
+
+    if (data.success) {
+      return data;
     } else {
-      throw new Error(response.data.message || "Failed to update column order");
+      throw new Error(data.message || "Failed to update column order");
     }
   } catch (error) {
     console.error("Error updating column order:", error.message);
@@ -96,31 +122,23 @@ const updateColumnOrder = async (columnOrder) => {
   }
 };
 
-const updateTaskOrder = async ({
-  taskId,
-  newOrder,
-  columnId,
-  title,
-  description,
-}) => {
+// 🟢 Update task order
+const updateTaskOrder = async ({ taskId, newOrder, columnId, title, description }) => {
   try {
-    const response = await axios.put(`${API_URL}/tasks/order`, {
-      tasks: [
-        {
-          id: taskId,
-          orderTask: newOrder,
-          columnId: columnId,
-          title: title,
-          description: description,
-        },
-      ],
+    const response = await fetch(`${API_URL}/tasks/order`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tasks: [{ id: taskId, orderTask: newOrder, columnId, title, description }],
+      }),
     });
 
-    if (response.data.success === true) {
-      return response.data.data ?? {};
+    const data = await response.json();
+
+    if (data.success) {
+      return data.data ?? {};
     } else {
-      console.log(response);
-      throw new Error(response.data.message || "Failed to update task order");
+      throw new Error(data.message || "Failed to update task order");
     }
   } catch (error) {
     console.error("Error updating task order:", error.message);
@@ -128,29 +146,16 @@ const updateTaskOrder = async ({
   }
 };
 
-export const useColumns = () => {
-  return useQuery({
-    queryKey: ["columns"],
-    queryFn: fetchColumns,
-    staleTime: 5000,
-  });
-};
+// 🟢 Hooks sử dụng react-query
+export const useColumns = () => useQuery({ queryKey: ["columns"], queryFn: fetchColumns, staleTime: 5000 });
 
-export const useTasks = () => {
-  return useQuery({
-    queryKey: ["tasks"],
-    queryFn: fetchTasks,
-    staleTime: 5000,
-  });
-};
+export const useTasks = () => useQuery({ queryKey: ["tasks"], queryFn: fetchTasks, staleTime: 5000 });
 
 export const useCreateTask = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: createTask,
-    onSuccess: () => {
-      queryClient.invalidateQueries(["tasks"]);
-    },
+    onSuccess: () => queryClient.invalidateQueries(["tasks"]),
   });
 };
 
@@ -158,9 +163,7 @@ export const useUpdateTask = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: updateTask,
-    onSuccess: () => {
-      queryClient.invalidateQueries(["tasks"]);
-    },
+    onSuccess: () => queryClient.invalidateQueries(["tasks"]),
   });
 };
 
@@ -168,9 +171,7 @@ export const useDeleteTask = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: deleteTask,
-    onSuccess: () => {
-      queryClient.invalidateQueries(["tasks"]);
-    },
+    onSuccess: () => queryClient.invalidateQueries(["tasks"]),
   });
 };
 
@@ -178,9 +179,7 @@ export const useUpdateColumnOrder = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: updateColumnOrder,
-    onSuccess: () => {
-      queryClient.invalidateQueries(["columns"]);
-    },
+    onSuccess: () => queryClient.invalidateQueries(["columns"]),
   });
 };
 
@@ -188,8 +187,6 @@ export const useUpdateTaskOrder = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: updateTaskOrder,
-    onSuccess: () => {
-      queryClient.invalidateQueries(["tasks"]);
-    },
+    onSuccess: () => queryClient.invalidateQueries(["tasks"]),
   });
 };
